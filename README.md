@@ -42,10 +42,11 @@ the site's files.
 `issue.json` is generated, so don't edit it by hand. Re-run the script instead.
 It is committed, because the deployed page fetches it.
 
-**Don't push an issue's `issue.json` before its email has gone out.** Once
-Netlify is linked to this repo, a push puts the word on the reel site. The
-script warns on stderr while an issue's 13:31 London send is still ahead.
-Pulling early to render on the Mac is fine.
+**Don't push an issue's `issue.json` before its email has gone out.** The repo
+is public and Netlify deploys every push to `main`, so a push publishes the
+word twice: on GitHub and on the reel site. The script warns on stderr while
+an issue's 13:31 London send is still ahead. Pulling early to render on the
+Mac is fine.
 
 ## The three commands
 
@@ -78,7 +79,11 @@ seconds?" 240 times, and the page has to give the same answer each time.
   true, and render stops after 30 seconds with that message and leaves the
   last good frames alone.
 - **Render refuses to use fallback fonts.** If Google Fonts can't be reached,
-  it stops rather than drawing the word in Georgia.
+  it stops rather than drawing the word in Georgia. It looks in
+  `document.fonts` for Playfair Display 600 and DM Sans 400 and 500 with
+  status `loaded`. It deliberately doesn't use `document.fonts.check()`: with
+  no network the stylesheet never arrives, there are no faces to check, and
+  `check()` returns true.
 - **Chromium runs with `--disable-partial-raster`.** Without it, Chromium
   repaints only the patch of the page that changed, and the faint baseline's
   edge came out one level different depending on the patch. Two frames with

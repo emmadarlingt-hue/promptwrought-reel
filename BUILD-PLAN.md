@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0, M1 and M2 done 4 Oct 2026. Next: link the Netlify site to the repo (still deployed by folder upload), then M3.
+Status: M0, M1 and M2 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M3.
 
 ## What it is
 
