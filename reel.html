@@ -1,0 +1,195 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1080">
+<title>ghostwrought — elastic type, 8 s loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
+<style>html,body{margin:0;padding:0;background:#0E2A35;}#stage svg{display:block;width:100%;height:auto;}</style></head>
+<body><div id="stage" role="img" aria-label="The word ghostwrought stretching letter by letter on a locked baseline, 8 second loop"></div>
+<script>
+// Elastic type, adapted from tile 10 of Charlie Hills' Opus 5.5 Motion Graphics board.
+// Content: Promptwrought issue 010. Palette and fonts: emmadarling.dev tokens (dark theme 2a).
+//
+// Pure seek(t): every frame is a function of t only — no tween state, no CSS animation.
+// Unlike the chart and the reveal, this tile positions each letter individually, so it
+// needs real font metrics. Everything below waits for the fonts, then measures.
+(function () {
+
+// ---------- canvas ----------
+const W = 1080, H = 1080;
+const BASE = 460;        // the locked baseline the letters stretch against
+const TARGET = 880;      // how wide the word is at rest; the font size is derived from it
+
+// ---------- palette: the raw paint pots from tokens.css ----------
+const TEAL = '#0E2A35', CREAM = '#F5EDD6', LAV = '#C9B8D8', GOLD = '#C8922A';
+
+// ---------- the issue, straight off the latest-issue card ----------
+const WORD = 'ghostwrought';
+const EYEBROW = 'Latest issue';
+const SUMMARY = 'Of work: produced entirely by a machine yet presented under a human name; ghostwritten by something that was never alive.';
+const META = 'Issue 010 · 29 Sept 2026';
+const LINK = 'promptwrought.substack.com/p/ghostwrought';
+
+// The stretch peaks on the seam where "wrought" begins, so the tallest letter
+// is also the one that names the series. That letter takes the gold.
+const PEAK = WORD.indexOf('w');
+
+// ---------- timing: 8 s loop ----------
+const LOOP = 8, F = 2.2, HOLD = 4.4, RET = 1.4;
+
+// ---------- math ----------
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const eio = (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; };
+const r2 = (n) => Math.round(n * 100) / 100;
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// ---------- the two curves, recovered from the kit's hardcoded 7-letter arrays ----------
+// The original wrote SY and SX out by hand for "STRETCH". These reproduce those
+// numbers to three decimals, so a word of any length gets the same feel.
+// d is 0 at the peak letter and 1 at whichever end is further away.
+const syAt = (d) => 1 + 1.05 * Math.pow(1 - d, 1.35);   // taller toward the peak
+const sxAt = (d) => 0.78 + 0.30 * Math.pow(d, 1.6);     // and narrower with it
+
+// Both sides normalise to 1 independently, so an off-centre peak still reads balanced.
+const LETTERS = WORD.split('');
+const N = LETTERS.length;
+const DIST = LETTERS.map((_, i) => i <= PEAK ? (PEAK - i) / PEAK : (i - PEAK) / (N - 1 - PEAK));
+
+// ---------- svg builders ----------
+const DISPLAY = "'Playfair Display', Georgia, serif";
+const BODY = "'DM Sans', system-ui, sans-serif";
+function tx(x, y, str, o = {}) {
+  const { s = 13, w = 500, f = 'b', fill = CREAM, op = 1, a = 'start', ls = 0 } = o;
+  return `<text x="${r2(x)}" y="${r2(y)}" font-family="${f === 'd' ? DISPLAY : BODY}" font-size="${r2(s)}" font-weight="${w}" fill="${fill}"${op !== 1 ? ` opacity="${r2(op)}"` : ''}${a !== 'start' ? ` text-anchor="${a}"` : ''}${ls ? ` letter-spacing="${ls}"` : ''}>${esc(str)}</text>`;
+}
+const line = (x1, y1, x2, y2, stroke, sw = 1.5, op = 1, dash = '') => `<line x1="${r2(x1)}" y1="${r2(y1)}" x2="${r2(x2)}" y2="${r2(y2)}" stroke="${stroke}" stroke-width="${sw}"${op !== 1 ? ` opacity="${r2(op)}"` : ''}${dash ? ` stroke-dasharray="${dash}"` : ''} stroke-linecap="round"/>`;
+const circ = (cx, cy, r, fill, o = {}) => `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(r)}" fill="${fill}"${o.stroke ? ` stroke="${o.stroke}" stroke-width="${o.sw ?? 1}"` : ''}/>`;
+const rect = (x, y, w, h, fill, o = {}) => `<rect x="${r2(x)}" y="${r2(y)}" width="${r2(w)}" height="${r2(h)}"${o.rx ? ` rx="${r2(o.rx)}"` : ''} fill="${fill}"${o.op !== undefined ? ` opacity="${r2(o.op)}"` : ''}/>`;
+// The little arrow that makes it look draggable.
+const cursor = (x, y) => `<path d="M${r2(x)},${r2(y)} l0,25 l6.5,-6.2 l4.7,10.6 l4.4,-1.9 l-4.6,-10.3 l8.8,-0.4 z" fill="${CREAM}" stroke="${TEAL}" stroke-width="1.9" stroke-linejoin="round"/>`;
+
+// ---------- measurement: one canvas, memoised, as the board does it ----------
+let MCTX = null; const MC = {};
+function M(text, size, weight = 600, fam = 'd') {
+  const k = text + '|' + size + '|' + weight + '|' + fam;
+  if (MC[k] === undefined) {
+    MCTX.font = `${weight} ${size}px ${fam === 'd' ? "'Playfair Display'" : "'DM Sans'"}`;
+    MC[k] = MCTX.measureText(text).width;
+  }
+  return MC[k];
+}
+
+// ---------- derived once the fonts are in ----------
+let S, GAP, REST;
+function measureUp() {
+  // Letter advances scale linearly with font size, so one probe gives the exact fit.
+  const probe = 100, gapRatio = 0.13;
+  const w100 = LETTERS.reduce((a, c) => a + M(c, probe), 0) + probe * gapRatio * (N - 1);
+  S = probe * TARGET / w100;
+  GAP = S * gapRatio;
+  REST = LETTERS.map((c) => M(c, S));
+}
+
+// Greedy wrap, needed because SVG text does not wrap on its own.
+function wrap(str, size, maxW) {
+  const words = str.split(' '), lines = []; let cur = '';
+  for (const word of words) {
+    const next = cur ? cur + ' ' + word : word;
+    if (M(next, size, 400, 'b') > maxW && cur) { lines.push(cur); cur = word; }
+    else cur = next;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// ---------- the frame: everything that never moves ----------
+function staticSvg() {
+  let o = rect(0, 0, W, H, TEAL);
+  o += tx(W / 2, 150, EYEBROW.toUpperCase(), { s: 19, w: 500, fill: LAV, a: 'middle', ls: 3.4 });
+
+  // The baseline the letters are pinned to, and its label.
+  o += line(80, BASE, W - 80, BASE, LAV, 1.4, 0.55);
+  // Right-anchored on purpose: the 'g' of ghostwrought descends to y~512 when
+  // stretched, and on the left this label would sit underneath it.
+  o += tx(W - 80, BASE + 30, 'baseline', { s: 17, w: 500, fill: LAV, a: 'end', ls: 1.2, op: 0.7 });
+
+  const sum = wrap(SUMMARY, 26, 760);
+  sum.forEach((ln, i) => { o += tx(W / 2, 620 + i * 40, ln, { s: 26, w: 400, fill: CREAM, a: 'middle', op: 0.92 }); });
+  const below = 620 + sum.length * 40;
+  o += tx(W / 2, below + 36, META, { s: 20, w: 500, fill: LAV, a: 'middle', op: 0.8 });
+  o += tx(W / 2, H - 70, LINK, { s: 19, w: 500, fill: GOLD, a: 'middle', ls: 1.4 });
+
+  o += `<g id="live"></g>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${o}</svg>`;
+}
+
+// ---------- the tile: a pure function of p (0 at rest, 1 fully stretched) ----------
+function draw(p) {
+  // Each letter eases on its own clock, radiating out from the peak. p is
+  // overdriven *1.36 so the furthest letter (offset 0.36) still finishes in time.
+  const ks = DIST.map((d) => eio(p * 1.36 - d * 0.36));
+  const sy = ks.map((k, i) => lerp(1, syAt(DIST[i]), k));
+  const sx = ks.map((k, i) => lerp(1, sxAt(DIST[i]), k));
+
+  const ws = REST.map((wd, i) => wd * sx[i]);
+  const total = ws.reduce((a, b) => a + b, 0) + GAP * (N - 1);
+
+  let o = '', x = (W - total) / 2, ex = 0;
+  LETTERS.forEach((c, i) => {
+    // scale() about the baseline origin: height grows upward, width about the left edge.
+    o += `<g transform="translate(${r2(x)},${BASE}) scale(${r2(sx[i] * 1000) / 1000},${r2(sy[i] * 1000) / 1000})">`
+       + tx(0, 0, c, { s: S, w: 600, f: 'd', fill: i === PEAK ? GOLD : CREAM }) + `</g>`;
+    if (i === PEAK) ex = x + ws[i] / 2;
+    x += ws[i] + GAP;
+  });
+
+  // The cap-height caliper on the peak letter, and the arrow pulling it up.
+  const capRest = BASE - S * 0.7, capNow = BASE - S * 0.7 * sy[PEAK];
+  if (capRest - capNow > 3) o += line(ex, capRest, ex, capNow - 10, LAV, 1.4, 0.75, '3 4');
+  o += circ(ex, capNow - 13, 6.5, TEAL, { stroke: LAV, sw: 2.4 });
+  o += cursor(ex + 12, capNow - 32);
+  return o;
+}
+
+// ---------- the loop: p is read off the clock, never accumulated ----------
+function pAt(t) {
+  const L = ((t % LOOP) + LOOP) % LOOP;
+  if (L < F) return eio(L / F);                                  // stretch
+  if (L < F + HOLD) return 1;                                    // hold
+  if (L < F + HOLD + RET) return 1 - eio((L - F - HOLD) / RET);   // relax
+  return 0;
+}
+
+// ---------- start: fonts first, then measure, then paint ----------
+async function start() {
+  MCTX = document.createElement('canvas').getContext('2d');
+  // If the fonts are unreachable, these resolve anyway and measureText reports
+  // the fallback (Georgia / system-ui). The layout stays correct either way,
+  // because it is derived from whatever font actually answered.
+  try {
+    await Promise.all([
+      document.fonts.load('600 100px "Playfair Display"'),
+      document.fonts.load('400 26px "DM Sans"'),
+      document.fonts.load('500 20px "DM Sans"'),
+    ]);
+    await document.fonts.ready;
+  } catch (e) { /* offline: fall through on the fallback metrics */ }
+
+  measureUp();
+  document.getElementById('stage').innerHTML = staticSvg();
+  const LIVE = document.getElementById('live');
+  window.LOOP_SECONDS = LOOP;
+  window.seek = (t) => { LIVE.innerHTML = draw(pAt(t)); };
+
+  seek(0);
+  window.__ready = true;
+  if (!location.search.includes('render')) {
+    const t0 = performance.now();
+    const tick = (now) => { seek((now - t0) / 1000); requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }
+}
+start();
+})();
+</script>
+</body></html>
