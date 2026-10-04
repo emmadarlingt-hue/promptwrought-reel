@@ -10,17 +10,19 @@ board, and was adapted to the emmadarling.dev palette. It is copied in
 unchanged from `../opus-5-5-motion-graphics/effect-10-elastic-type.html`.
 
 This folder exists to turn that file into a video, the same way every week.
+`BUILD-PLAN.md` lays out how, one milestone at a time.
 
 ## The three commands
 
 None of these exist yet. M0 only sets up the folder, the repo and the deploy.
-This is where the pipeline is heading:
 
-| Command | What it will do |
-|---|---|
-| `npm run preview` | Serve the folder and play the loop live in a browser. |
-| `npm run render` | Open `reel.html?render` in headless Chrome, step through every frame and save each one as a PNG. |
-| `npm run encode` | Pass the PNGs to ffmpeg and get an MP4 back. |
+| Command | What it will do | Arrives |
+|---|---|---|
+| `python3 tools/pull-issue.py 010` | Copy issue 010 from `../promptwrought-site/issues/` to `issue.json`, adding its release date and issue label. | M1 |
+| `python3 -m http.server` | Serve the folder so `reel.html` can fetch `issue.json`, and play the loop in a browser. | M1 |
+| `node render.mjs` | Step `reel.html?render` through 240 frames in headless Chrome, then have ffmpeg turn them into an MP4 and a GIF in `out/`. | M2 |
+
+At M4 they become one Tuesday command, `npm run tuesday -- 011`.
 
 `reel.html` already has the hooks the render step needs. Every frame is drawn
 from the time alone, so `seek(t)` draws the frame at `t` and nothing builds up
