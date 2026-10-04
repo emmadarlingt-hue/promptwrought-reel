@@ -18,11 +18,12 @@ None of these exist yet. M0 only sets up the folder, the repo and the deploy.
 
 | Command | What it will do | Arrives |
 |---|---|---|
-| `python3 tools/pull-issue.py 010` | Copy issue 010 from `../promptwrought-site/issues/` to `issue.json`, adding its release date and issue label. | M1 |
-| `python3 -m http.server` | Serve the folder so `reel.html` can fetch `issue.json`, and play the loop in a browser. | M1 |
-| `node render.mjs` | Step `reel.html?render` through 240 frames in headless Chrome, then have ffmpeg turn them into an MP4 and a GIF in `out/`. | M2 |
+| `npm run preview` | Serve the folder and play the loop in a browser. It needs a server because `reel.html` will fetch `issue.json`, and `fetch` refuses `file://`. | M1 |
+| `npm run render` | Open `reel.html?render` in headless Chrome, step through all 240 frames and save each one as a PNG. | M2 |
+| `npm run encode` | Pass the PNGs to ffmpeg and get an MP4 and a GIF back. | M2 |
 
-At M4 they become one Tuesday command, `npm run tuesday -- 011`.
+Render and encode stay separate, so a failure points at one half or the other.
+`npm run tuesday` arrives at M4 and chains pull-issue → render → encode.
 
 `reel.html` already has the hooks the render step needs. Every frame is drawn
 from the time alone, so `seek(t)` draws the frame at `t` and nothing builds up
