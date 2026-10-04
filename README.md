@@ -27,6 +27,38 @@ downloads the Chromium build that version uses, and does nothing if it is
 already there. They are separate on purpose, so that installing never
 downloads a browser without asking.
 
+### Keeping generated folders out of iCloud
+
+This repo is on `~/Desktop`, which iCloud Drive syncs. **The repo will move off
+`~/Desktop` after 6 Oct.** Until then, the three generated folders are kept out
+of iCloud, and every command still uses the usual names.
+
+- **Why.** Each render rewrites hundreds of frames. iCloud answered with
+  conflict copies such as `0078 2.png`, about 150 at a time, and once dropped
+  one into `frames/square/` mid-delete, which failed the render.
+- **`frames` and `out` are symlinks** to `frames.nosync` and `out.nosync`.
+  iCloud skips any name ending `.nosync`.
+- **`node_modules` stays a real folder**, because `npm install` replaces a
+  symlinked `node_modules` with a real one. It carries the attribute iCloud
+  honours instead, `com.apple.fileprovider.ignore#P`, which `npm install`
+  leaves in place.
+- **`npm ci` deletes `node_modules` outright.** After running it, set the
+  attribute again:
+
+  ```bash
+  xattr -w 'com.apple.fileprovider.ignore#P' 1 node_modules
+  ```
+
+- **To check what iCloud thinks,** run the command below. It should show
+  `isExcludedFromSync = 1`; repeat it for `out.nosync` and `node_modules`.
+
+  ```bash
+  fileproviderctl evaluate "$PWD/frames.nosync"
+  ```
+
+- **After the move off `~/Desktop`,** none of this is needed. `frames` and `out`
+  can go back to being plain folders, and `.gitignore` ignores either form.
+
 ## Pulling an issue
 
 ```bash
@@ -56,6 +88,7 @@ Mac is fine.
 | `npm run render` | Open `reel.html?render` in headless Chromium, wait for the page to be ready, then step through all 240 frames and save each one to `frames/square/` as a PNG, plus `still.png` from t = 4.4 s. Add `-- --size portrait` for 1080 × 1350, or `-- --size vertical` for 1080 × 1920, into `frames/<size>/`. | ✅ M2, portrait M3, vertical M3.5 |
 | `npm run encode` | Pass `frames/square/` to ffmpeg and get `out/010-ghostwrought-square.mp4`, `.gif` and `-still.png` back. Add `-- --size portrait` or `-- --size vertical` for those sets. | ✅ M2, portrait M3, vertical M3.5 |
 | `npm run check:offline` | Prove render refuses fallback fonts. It runs render with its browser cut off from the network (`tools/offline-preload.mjs`), once with nothing reachable and once with only the stylesheet. Both runs must stop with "fonts didn't load" and leave `frames/` untouched. Takes about a second. | ✅ M2 |
+| `npm run check:square` | Prove the square render hasn't changed. It renders the frozen 010 fixture (`tools/fixtures/`) into a temporary folder and compares all 240 frames and the still with `tools/check-square.md5`. It leaves `issue.json` and `frames/` alone and takes about 9 seconds. After a change that's meant to show, look at the frames, then re-take the baseline with `-- --update`. | ✅ M3.5 |
 
 Render and encode stay separate, so a failure points at one half or the other.
 `npm run tuesday` arrives at M4 and chains pull-issue → render → encode.
@@ -117,7 +150,9 @@ real top. The page asks the canvas how far the glyph's ink actually reaches
 about 0.52 × the font size and an `f` at about 0.78 ×, so a single guess of 0.7
 left the handle floating above the `w` and partway down the `f`. The letter
 stretches about its baseline, so its top is always that height times its
-stretch.
+stretch. The handle keeps the same clearance above that top for every letter,
+0.1 × the font size (about 11 px on ghostwrought, 13 px on verifidget), and the
+dashed line runs on up into it.
 
 ### How the render works
 

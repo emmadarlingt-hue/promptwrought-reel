@@ -20,3 +20,13 @@ Two rules hold at every milestone:
   `window.CANVAS` and `window.STILL_SECONDS` working, because the renderer
   depends on them. This is what makes a render deterministic and
   the loop seamless: the first and last frames are the same picture.
+
+**Before committing** a change to `reel.html` or `render.mjs`, run
+`npm run check:square` and `npm run check:offline`. If `check:square` fails
+because of a change you meant, show the frames before re-taking the baseline
+with `-- --update`. Never re-take it just to make the check pass.
+
+**Until the repo moves off `~/Desktop` (after 6 Oct),** `frames` and `out` are
+symlinks to `*.nosync` folders that iCloud skips. Don't replace them with real
+folders. The README's "Keeping generated folders out of iCloud" section has the
+details.

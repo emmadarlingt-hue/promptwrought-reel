@@ -11,9 +11,9 @@
 // question and the screenshot.
 import { chromium } from 'playwright';
 import { createServer } from 'node:http';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { dirname, extname, join, normalize, sep } from 'node:path';
+import { dirname, extname, join, normalize, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
@@ -38,11 +38,12 @@ const pad = (n, width) => String(n).padStart(width, '0');
 
 // fetch refuses file://, so the page needs http. This serves the repo folder
 // on a port the system picks, so it never clashes with a running preview.
-function serve() {
+// /issue.json is whichever issue file this render was given.
+function serve(issuePath) {
   const server = createServer(async (req, res) => {
     const path = decodeURIComponent(new URL(req.url, 'http://localhost').pathname);
-    const file = normalize(join(ROOT, path));
-    if (!file.startsWith(ROOT + sep)) return res.writeHead(404).end();
+    const file = path === '/issue.json' ? issuePath : normalize(join(ROOT, path));
+    if (file !== issuePath && !file.startsWith(ROOT + sep)) return res.writeHead(404).end();
     try {
       const body = await readFile(file);
       res.writeHead(200, { 'Content-Type': TYPES[extname(file)] ?? 'application/octet-stream' }).end(body);
@@ -57,12 +58,30 @@ async function main() {
   const started = Date.now();
   // The page owns the list of sizes and refuses one it doesn't know, before
   // anything is written. So --size is passed straight through.
-  const { size } = parseArgs({ options: { size: { type: 'string', default: 'square' } } }).values;
-  const issuePath = join(ROOT, 'issue.json');
-  if (!existsSync(issuePath)) throw new Error('there is no issue.json. Run python3 tools/pull-issue.py 010 first.');
+  // --issue and --frames exist for tools/check-square.mjs, which renders a
+  // fixed issue into a temporary folder and leaves issue.json and frames/ alone.
+  const args = parseArgs({ options: {
+    size: { type: 'string', default: 'square' },
+    issue: { type: 'string' },
+    frames: { type: 'string' },
+  } }).values;
+  const { size } = args;
+  const issuePath = args.issue ? resolve(args.issue) : join(ROOT, 'issue.json');
+  if (!existsSync(issuePath)) {
+    throw new Error(args.issue ? `there is no ${args.issue}.` : 'there is no issue.json. Run python3 tools/pull-issue.py 010 first.');
+  }
   const { no, word } = JSON.parse(readFileSync(issuePath, 'utf8'));
 
-  const server = await serve();
+  // Render clears its frames folder before writing. Given an arbitrary
+  // --frames, refuse unless the folder is missing or holds nothing but a
+  // previous render, so a slip of the keyboard can't empty a real folder.
+  const frames = args.frames ? resolve(args.frames) : join(ROOT, 'frames', size);
+  const RENDERED = /^(\d{4}\.png|still\.png|render\.json|palette\.png)$/;
+  if (args.frames && existsSync(frames) && !readdirSync(frames).every((name) => RENDERED.test(name))) {
+    throw new Error(`${args.frames} holds files render didn't make, so render won't clear it.`);
+  }
+
+  const server = await serve(issuePath);
   // By default Chromium repaints only the part of a tile that changed. Where
   // that patch crosses the faint baseline, the line's anti-aliased edge comes
   // out one level different, so two frames with identical SVG differed and the
@@ -112,11 +131,10 @@ async function main() {
 
     // Only now, with a page that can draw, is it safe to clear the last render
     // of this size. The other size's frames are left alone.
-    const frames = join(ROOT, 'frames', size);
-    // Retried because this folder sits in iCloud Drive (~/Desktop syncs), and
-    // iCloud can drop a conflict copy ("0078 2.png") into it mid-delete, which
-    // fails with ENOTEMPTY. encode reads only 0001.png-style names, so those
-    // copies never reach a video.
+    // Retried because a sync tool can drop a file into the folder mid-delete,
+    // which fails with ENOTEMPTY. iCloud did, with conflict copies such as
+    // "0078 2.png", until frames/ became a symlink to frames.nosync, which
+    // iCloud skips. encode reads only 0001.png-style names either way.
     rmSync(frames, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     mkdirSync(frames, { recursive: true });
 
@@ -147,7 +165,7 @@ async function main() {
 
     const seconds = ((Date.now() - started) / 1000).toFixed(1);
     console.log(`${total} frames and a still of ${pad(no, 3)} ${word} (${size}, ${canvas.width} × ${canvas.height}) `
-      + `in frames/${size}/, ${seconds} s. Next: npm run encode${size === 'square' ? '' : ` -- --size ${size}`}`);
+      + `in ${relative(ROOT, frames) || '.'}/, ${seconds} s. Next: npm run encode${size === 'square' ? '' : ` -- --size ${size}`}`);
   } finally {
     await browser.close();
     server.close();

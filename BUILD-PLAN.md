@@ -59,6 +59,7 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - `?size=vertical` → 1080×1920 for Reels / TikTok. The block is centred within the apps' safe zone, the part of the frame their own buttons and captions don't cover, not placed by the `SHIFT` rule.
 - The caliper measures the peak glyph's real top instead of cap height, so on a tall peak such as the `f` in verifidget and handfinish it sits on the letter rather than partway down it. This changes square's frames on purpose, so square's hash baseline is re-taken afterwards.
 - A `window.__failed` flag, set when the page refuses to draw, so a refused render exits at once instead of after the 30-second wait.
+- Added while finishing: the handle keeps a fixed clearance of 0.1 × S above the letter's real top, the same for every letter. `npm run check:square` re-proves the square render against a committed hash baseline in about 9 s. `frames`, `out` and `node_modules` are kept out of iCloud until the repo moves off `~/Desktop` after 6 Oct.
 - You learn: designing around another app's interface, measuring the ink rather than trusting a font metric, and making failure as quick to see as success.
 
 ### M4 — The Tuesday command
@@ -72,6 +73,7 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 
 - Batch-render all ten past issues. Any layout that breaks on a long definition (ghostwrought's is the longest so far) gets fixed in the page, not by editing the JSON.
 - `/accessibility-review` is not relevant to a video; instead write the alt text template for the post into the README ("The word X stretching letter by letter on a baseline, with its definition").
+- Known and left alone: on a phone, `reel.html?size=vertical` is about 80 px taller than Safari's visible area, so it starts at the top and scrolls a little rather than centring. Only the check page is affected; the video is what matters.
 
 ## Not doing (and why)
 

@@ -215,11 +215,14 @@ function draw(p) {
   });
 
   // The caliper on the peak letter's real top, and the arrow pulling it up. The
-  // letter scales about the baseline, so its top is at ASC × sy above it.
+  // letter scales about the baseline, so its top is at ASC × sy above it. The
+  // handle keeps the same clearance above that top for every letter, 0.1 × S,
+  // and the dashed line runs on up into the handle.
   const capRest = BASE - ASC, capNow = BASE - ASC * sy[PEAK];
-  if (capRest - capNow > 3) o += line(ex, capRest, ex, capNow - 10, LAV, 1.4, 0.75, '3 4');
-  o += circ(ex, capNow - 13, 6.5, TEAL, { stroke: LAV, sw: 2.4 });
-  o += cursor(ex + 12, capNow - 32);
+  const handle = capNow - 0.1 * S - 6.5;   // the circle's centre; 6.5 is its radius
+  if (capRest - capNow > 3) o += line(ex, capRest, ex, handle + 3, LAV, 1.4, 0.75, '3 4');
+  o += circ(ex, handle, 6.5, TEAL, { stroke: LAV, sw: 2.4 });
+  o += cursor(ex + 12, handle - 19);
   return o;
 }
 
