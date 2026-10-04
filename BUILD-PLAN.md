@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0 done 4 Oct 2026. Next: commit this plan into the repo as `BUILD-PLAN.md` + a short `CLAUDE.md`, link the Netlify site to the repo, then M1.
+Status: M0 and M1 done 4 Oct 2026. Next: link the Netlify site to the repo (still deployed by folder upload), then M2.
 
 ## What it is
 
@@ -33,7 +33,7 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - Netlify project `promptwrought-reel` deployed by folder upload: https://promptwrought-reel.netlify.app/reel.html (bare address 404s; fine). Not yet linked to the repo — link it in the dashboard (Project configuration → Build & deploy → Link repository; no build command, publish directory root) so pushes deploy from M1 on.
 - Phone: square sits at the top with teal below because the tile fixes `viewport` at 1080 — correct for a square video; revisit at M3.
 
-### M1 — The page reads its words from a file
+### M1 — The page reads its words from a file ✅ 4 Oct 2026
 
 - `tools/pull-issue.py 010` copies `../promptwrought-site/issues/010-*.json` to `issue.json` beside `reel.html`, adding `date` (Tuesday of week `no`+30) and `issueLabel` ("Issue 010 · 29 Sept 2026").
 - `reel.html` replaces its hard-coded WORD / SUMMARY / META / LINK constants with a `fetch('issue.json')`, and waits for both the JSON and `document.fonts.ready` before the first `seek(0)`.

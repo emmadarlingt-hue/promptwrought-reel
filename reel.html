@@ -1,13 +1,14 @@
 <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=1080">
-<title>ghostwrought — elastic type, 8 s loop</title>
+<title>Promptwrought — elastic type, 8 s loop</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
 <style>html,body{margin:0;padding:0;background:#0E2A35;}#stage svg{display:block;width:100%;height:auto;}</style></head>
-<body><div id="stage" role="img" aria-label="The word ghostwrought stretching letter by letter on a locked baseline, 8 second loop"></div>
+<body><div id="stage" role="img" aria-label="A Promptwrought word stretching letter by letter on a locked baseline, 8 second loop"></div>
 <script>
 // Elastic type, adapted from tile 10 of Charlie Hills' Opus 5.5 Motion Graphics board.
-// Content: Promptwrought issue 010. Palette and fonts: emmadarling.dev tokens (dark theme 2a).
+// Content: issue.json, written by tools/pull-issue.py from the site's issue JSON.
+// Palette and fonts: emmadarling.dev tokens (dark theme 2a).
 //
 // Pure seek(t): every frame is a function of t only — no tween state, no CSS animation.
 // Unlike the chart and the reveal, this tile positions each letter individually, so it
@@ -22,16 +23,10 @@ const TARGET = 880;      // how wide the word is at rest; the font size is deriv
 // ---------- palette: the raw paint pots from tokens.css ----------
 const TEAL = '#0E2A35', CREAM = '#F5EDD6', LAV = '#C9B8D8', GOLD = '#C8922A';
 
-// ---------- the issue, straight off the latest-issue card ----------
-const WORD = 'ghostwrought';
+// ---------- the issue: read from issue.json before the first frame ----------
 const EYEBROW = 'Latest issue';
-const SUMMARY = 'Of work: produced entirely by a machine yet presented under a human name; ghostwritten by something that was never alive.';
-const META = 'Issue 010 · 29 Sept 2026';
-const LINK = 'promptwrought.substack.com/p/ghostwrought';
-
-// The stretch peaks on the seam where "wrought" begins, so the tallest letter
-// is also the one that names the series. That letter takes the gold.
-const PEAK = WORD.indexOf('w');
+let WORD, SUMMARY, META, LINK;
+let PEAK, LETTERS, N, DIST;
 
 // ---------- timing: 8 s loop ----------
 const LOOP = 8, F = 2.2, HOLD = 4.4, RET = 1.4;
@@ -50,10 +45,29 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 const syAt = (d) => 1 + 1.05 * Math.pow(1 - d, 1.35);   // taller toward the peak
 const sxAt = (d) => 0.78 + 0.30 * Math.pow(d, 1.6);     // and narrower with it
 
-// Both sides normalise to 1 independently, so an off-centre peak still reads balanced.
-const LETTERS = WORD.split('');
-const N = LETTERS.length;
-const DIST = LETTERS.map((_, i) => i <= PEAK ? (PEAK - i) / PEAK : (i - PEAK) / (N - 1 - PEAK));
+// ---------- the issue, set once from issue.json, read by every frame ----------
+// Site fields are HTML fragments; SVG text wants the plain words, entities decoded.
+const plainText = (html) => new DOMParser().parseFromString(html, 'text/html').body.textContent.trim();
+
+function useIssue(issue) {
+  WORD = issue.word;
+  SUMMARY = plainText(issue.definition);
+  META = issue.issueLabel;
+  LINK = issue.issueUrl.replace(/^https?:\/\//, '');
+  document.title = `${WORD} — elastic type, 8 s loop`;
+  document.getElementById('stage').setAttribute('aria-label',
+    `The word ${WORD} stretching letter by letter on a locked baseline, 8 second loop`);
+
+  LETTERS = WORD.split('');
+  N = LETTERS.length;
+  // The stretch peaks on the seam of the coinage, and the peak letter takes the gold.
+  // In the -wright / -wrought family that seam is the 'w', the letter that names the
+  // series. Any other word peaks on its middle letter.
+  const seam = WORD.search(/wr(?:ight|ought)$/);
+  PEAK = seam > 0 ? seam : Math.floor((N - 1) / 2);
+  // Both sides normalise to 1 independently, so an off-centre peak still reads balanced.
+  DIST = LETTERS.map((_, i) => i <= PEAK ? (PEAK - i) / PEAK : (i - PEAK) / (N - 1 - PEAK));
+}
 
 // ---------- svg builders ----------
 const DISPLAY = "'Playfair Display', Georgia, serif";
@@ -160,9 +174,17 @@ function pAt(t) {
   return 0;
 }
 
-// ---------- start: fonts first, then measure, then paint ----------
-async function start() {
-  MCTX = document.createElement('canvas').getContext('2d');
+// ---------- start: the issue and the fonts, then measure, then paint ----------
+// issue.json has to come over http, because fetch refuses file://. Open this page
+// through `npm run preview`, not by double-clicking it.
+async function loadIssue() {
+  // no-store, so a reload after re-running pull-issue.py shows the new word.
+  const res = await fetch('issue.json', { cache: 'no-store' });
+  if (!res.ok) throw new Error(`issue.json: HTTP ${res.status}`);
+  return res.json();
+}
+
+async function loadFonts() {
   // If the fonts are unreachable, these resolve anyway and measureText reports
   // the fallback (Georgia / system-ui). The layout stays correct either way,
   // because it is derived from whatever font actually answered.
@@ -174,6 +196,30 @@ async function start() {
     ]);
     await document.fonts.ready;
   } catch (e) { /* offline: fall through on the fallback metrics */ }
+}
+
+// Said on the stage rather than left blank. __ready is never set, so a render
+// waits on a page that cannot draw instead of recording an empty loop.
+function fail(err) {
+  const lines = [
+    ["Couldn't load issue.json.", 30, 500, CREAM],
+    ['Run python3 tools/pull-issue.py 010, then npm run preview', 24, 400, CREAM],
+    ['and open localhost:8000/reel.html. fetch refuses file://.', 24, 400, CREAM],
+    [String(err && err.message || err), 19, 500, LAV],
+  ];
+  let o = rect(0, 0, W, H, TEAL);
+  lines.forEach(([str, s, w, fill], i) => { o += tx(W / 2, 460 + i * 46, str, { s, w, fill, a: 'middle' }); });
+  document.getElementById('stage').innerHTML =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${o}</svg>`;
+  console.error(err);
+}
+
+async function start() {
+  MCTX = document.createElement('canvas').getContext('2d');
+  try {
+    const [issue] = await Promise.all([loadIssue(), loadFonts()]);
+    useIssue(issue);
+  } catch (err) { fail(err); return; }
 
   measureUp();
   document.getElementById('stage').innerHTML = staticSvg();

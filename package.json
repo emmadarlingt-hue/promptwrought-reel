@@ -1,0 +1,8 @@
+{
+  "name": "promptwrought-reel",
+  "private": true,
+  "description": "The Promptwrought word of the week as a square motion loop",
+  "scripts": {
+    "preview": "python3 -m http.server 8000"
+  }
+}
