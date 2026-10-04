@@ -1,16 +1,17 @@
-// Turn frames/ into out/NNN-word.mp4 and out/NNN-word.gif with ffmpeg.
+// Turn frames/<size>/ into out/NNN-word-<size>.mp4, .gif and -still.png.
 //
-//   npm run encode
+//   npm run encode                      square
+//   npm run encode -- --size portrait   portrait
 //
-// Reads frames/render.json, written by npm run render, so the files are named
-// after what was actually rendered rather than whatever issue.json says now.
+// Reads frames/<size>/render.json, written by npm run render, so the files are
+// named after what was actually rendered rather than whatever issue.json says now.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const FRAMES = join(ROOT, 'frames');
 const OUT = join(ROOT, 'out');
 
 // GIF frame delays are whole hundredths of a second. 25 fps is exactly 4 of
@@ -29,17 +30,20 @@ function ffmpeg(args) {
 }
 
 function main() {
+  const { size } = parseArgs({ options: { size: { type: 'string', default: 'square' } } }).values;
+  if (!/^[a-z]+$/.test(size)) throw new Error(`"${size}" is not a size. Use square or portrait.`);
+  const FRAMES = join(ROOT, 'frames', size);
+  const again = `npm run render${size === 'square' ? '' : ` -- --size ${size}`}`;
+
   const manifest = join(FRAMES, 'render.json');
-  if (!existsSync(manifest)) throw new Error('there is no frames/render.json. Run npm run render first.');
+  if (!existsSync(manifest)) throw new Error(`there is no frames/${size}/render.json. Run ${again} first.`);
   const { no, word, fps, frames } = JSON.parse(readFileSync(manifest, 'utf8'));
-  for (let i = 1; i <= frames; i++) {
-    if (!existsSync(join(FRAMES, `${pad(i, 4)}.png`))) {
-      throw new Error(`frames/${pad(i, 4)}.png is missing. Run npm run render again.`);
-    }
+  for (const file of [...Array.from({ length: frames }, (_, i) => `${pad(i + 1, 4)}.png`), 'still.png']) {
+    if (!existsSync(join(FRAMES, file))) throw new Error(`frames/${size}/${file} is missing. Run ${again} again.`);
   }
 
   mkdirSync(OUT, { recursive: true });
-  const name = `${pad(no, 3)}-${word}`;
+  const name = `${pad(no, 3)}-${word}-${size}`;
   const input = ['-framerate', String(fps), '-i', join(FRAMES, '%04d.png')];
 
   // MP4: H.264 in yuv420p, which is what LinkedIn and Substack accept. The
@@ -68,6 +72,11 @@ function main() {
     '-lavfi', `fps=${GIF_FPS}[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle`,
     '-loop', '0', gif]);
   console.log(`${relative(ROOT, gif)}  ${mb(gif)} MB`);
+
+  // The still is already a lossless PNG at full size, so it is copied as it is.
+  const still = join(OUT, `${name}-still.png`);
+  copyFileSync(join(FRAMES, 'still.png'), still);
+  console.log(`${relative(ROOT, still)}  ${mb(still)} MB`);
 
   if (statSync(gif).size >= GIF_LIMIT) {
     throw new Error(`${relative(ROOT, gif)} is ${mb(gif)} MB, over the 8 MB limit for posting.`);

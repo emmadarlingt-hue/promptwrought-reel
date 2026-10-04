@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0, M1 and M2 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M3.
+Status: M0–M3 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M4.
 
 ## What it is
 
@@ -48,7 +48,7 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - Checks before commit: frame 0001 and frame 0240 are identical (loop seam); file plays in QuickTime; GIF under 8 MB.
 - You learn: why `?render` turns off the `requestAnimationFrame` loop — a video render is a camera asking the page "what do you look like at 1.6 seconds?" 240 times, and the page must give the same answer each time. Also the first Node dependency you've managed yourself (`package.json`, `node_modules` in `.gitignore`).
 
-### M3 — Portrait and a still
+### M3 — Portrait and a still ✅ 4 Oct 2026
 
 - `npm run render -- --size portrait` → 1080×1350; the page reads a `?size=` parameter and moves the baseline and summary block, nothing else.
 - A still PNG from the hold (t = 4.4 s) as a share image.

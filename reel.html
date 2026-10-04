@@ -3,7 +3,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
-<style>html,body{margin:0;padding:0;background:#0E2A35;}#stage svg{display:block;width:100%;height:auto;}</style></head>
+<style>html,body{margin:0;padding:0;background:#0E2A35;}
+/* Centres the tile on a tall phone screen. A render's viewport is exactly the canvas, so it changes nothing there. */
+body{min-height:100vh;display:flex;flex-direction:column;justify-content:center;}
+#stage svg{display:block;width:100%;height:auto;}</style></head>
 <body><div id="stage" role="img" aria-label="A Promptwrought word stretching letter by letter on a locked baseline, 8 second loop"></div>
 <script>
 // Elastic type, adapted from tile 10 of Charlie Hills' Opus 5.5 Motion Graphics board.
@@ -15,9 +18,18 @@
 // needs real font metrics. Everything below waits for the fonts, then measures.
 (function () {
 
-// ---------- canvas ----------
-const W = 1080, H = 1080;
-const BASE = 460;        // the locked baseline the letters stretch against
+// ---------- canvas: ?size=square (the default) or ?size=portrait ----------
+// One drawing, two canvases. Portrait is 4:5 for the LinkedIn feed. Only the
+// baseline and the summary block below it move; the eyebrow stays put and the
+// link follows the bottom edge on its own.
+const HEIGHTS = { square: 1080, portrait: 1350 };
+const SIZE = new URLSearchParams(location.search).get('size') ?? 'square';
+const W = 1080, H = HEIGHTS[SIZE] ?? 1080;
+// The baseline sits at the same fraction of the height on both canvases:
+// 460 of 1080 and 575 of 1350. SHIFT is 0 for square, so square is unchanged.
+const SHIFT = Math.round(460 * H / 1080) - 460;
+const BASE = 460 + SHIFT; // the locked baseline the letters stretch against
+const SUMMARY_Y = 620 + SHIFT;
 const TARGET = 880;      // how wide the word is at rest; the font size is derived from it
 
 // ---------- palette: the raw paint pots from tokens.css ----------
@@ -128,8 +140,8 @@ function staticSvg() {
   o += tx(W - 80, BASE + 30, 'baseline', { s: 17, w: 500, fill: LAV, a: 'end', ls: 1.2, op: 0.7 });
 
   const sum = wrap(SUMMARY, 26, 760);
-  sum.forEach((ln, i) => { o += tx(W / 2, 620 + i * 40, ln, { s: 26, w: 400, fill: CREAM, a: 'middle', op: 0.92 }); });
-  const below = 620 + sum.length * 40;
+  sum.forEach((ln, i) => { o += tx(W / 2, SUMMARY_Y + i * 40, ln, { s: 26, w: 400, fill: CREAM, a: 'middle', op: 0.92 }); });
+  const below = SUMMARY_Y + sum.length * 40;
   o += tx(W / 2, below + 36, META, { s: 20, w: 500, fill: LAV, a: 'middle', op: 0.8 });
   o += tx(W / 2, H - 70, LINK, { s: 19, w: 500, fill: GOLD, a: 'middle', ls: 1.4 });
 
@@ -201,12 +213,14 @@ async function loadFonts() {
 // Said on the stage rather than left blank. __ready is never set, so a render
 // waits on a page that cannot draw instead of recording an empty loop.
 function fail(err) {
-  const lines = [
+  const lines = SIZE in HEIGHTS ? [
     ["Couldn't load issue.json.", 30, 500, CREAM],
     ['Run python3 tools/pull-issue.py 010, then npm run preview', 24, 400, CREAM],
     ['and open localhost:8000/reel.html. fetch refuses file://.', 24, 400, CREAM],
-    [String(err && err.message || err), 19, 500, LAV],
+  ] : [
+    ["Can't draw this size.", 30, 500, CREAM],
   ];
+  lines.push([String(err && err.message || err), 19, 500, LAV]);
   let o = rect(0, 0, W, H, TEAL);
   lines.forEach(([str, s, w, fill], i) => { o += tx(W / 2, 460 + i * 46, str, { s, w, fill, a: 'middle' }); });
   document.getElementById('stage').innerHTML =
@@ -217,6 +231,7 @@ function fail(err) {
 async function start() {
   MCTX = document.createElement('canvas').getContext('2d');
   try {
+    if (!(SIZE in HEIGHTS)) throw new Error(`unknown size "${SIZE}": use square or portrait`);
     const [issue] = await Promise.all([loadIssue(), loadFonts()]);
     useIssue(issue);
   } catch (err) { fail(err); return; }
@@ -225,6 +240,8 @@ async function start() {
   document.getElementById('stage').innerHTML = staticSvg();
   const LIVE = document.getElementById('live');
   window.LOOP_SECONDS = LOOP;
+  window.CANVAS = { width: W, height: H };     // the renderer sizes its camera from this
+  window.STILL_SECONDS = F + HOLD / 2;         // 4.4 s: the middle of the hold, fully stretched
   window.seek = (t) => { LIVE.innerHTML = draw(pAt(t)); };
 
   seek(0);

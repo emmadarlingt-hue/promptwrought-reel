@@ -25,11 +25,12 @@ const CASES = [
   ['files', 'stylesheet but no font files'],
 ];
 
-// Every file in frames/ with its size and modification time, so "untouched"
-// means untouched, not merely "still has 240 files".
+// Every file under frames/ (square/ and portrait/ alike) with its size and
+// modification time, so "untouched" means untouched, not merely "still has
+// 240 files".
 function snapshot() {
   if (!existsSync(FRAMES)) return 'no frames/';
-  return readdirSync(FRAMES).sort()
+  return readdirSync(FRAMES, { recursive: true }).sort()
     .map((name) => { const s = statSync(join(FRAMES, name)); return `${name}:${s.size}:${s.mtimeMs}`; })
     .join('\n');
 }
