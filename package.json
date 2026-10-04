@@ -5,7 +5,8 @@
   "scripts": {
     "preview": "python3 -m http.server 8000",
     "render": "node render.mjs",
-    "encode": "node encode.mjs"
+    "encode": "node encode.mjs",
+    "check:offline": "node tools/check-offline.mjs"
   },
   "devDependencies": {
     "playwright": "1.63.0"

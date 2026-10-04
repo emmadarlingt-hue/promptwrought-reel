@@ -55,6 +55,7 @@ Mac is fine.
 | `npm run preview` | Serve the folder on port 8000. Open <http://localhost:8000/reel.html> to play the loop. It needs a server because `fetch` refuses `file://`. | ✅ M1 |
 | `npm run render` | Open `reel.html?render` in headless Chromium, wait for the page to be ready, then step through all 240 frames and save each one to `frames/` as a PNG. | ✅ M2 |
 | `npm run encode` | Pass `frames/` to ffmpeg and get `out/010-ghostwrought.mp4` and `.gif` back. | ✅ M2 |
+| `npm run check:offline` | Prove render refuses fallback fonts. It runs render with its browser cut off from the network (`tools/offline-preload.mjs`), once with nothing reachable and once with only the stylesheet. Both runs must stop with "fonts didn't load" and leave `frames/` untouched. Takes about a second. | ✅ M2 |
 
 Render and encode stay separate, so a failure points at one half or the other.
 `npm run tuesday` arrives at M4 and chains pull-issue → render → encode.
