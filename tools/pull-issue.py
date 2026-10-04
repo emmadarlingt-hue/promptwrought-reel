@@ -2,15 +2,22 @@
 """Copy one issue from the site into issue.json, beside reel.html.
 
     python3 tools/pull-issue.py 010
+    python3 tools/pull-issue.py 011 --to frames/issue.json
 
 Reads ../promptwrought-site/issues/010-*.json and writes ./issue.json: the
 whole issue, plus the two things the page shows that the site never stores,
 `date` ("29 Sept 2026") and `issueLabel` ("Issue 010 · 29 Sept 2026").
 
+--to writes somewhere else. npm run tuesday uses it to render a new issue
+without touching the tracked issue.json, so nothing it does can be pushed
+before the email goes out.
+
 The site's files are only ever opened for reading. Standard library only.
 """
 
+import argparse
 import json
+import os
 import sys
 from datetime import date, datetime, time
 from pathlib import Path
@@ -65,9 +72,13 @@ def find_issue(number):
 
 
 def main(argv):
-    if len(argv) != 2 or not argv[1].isdigit():
-        sys.exit("usage: python3 tools/pull-issue.py <issue number>, e.g. 010")
-    number = int(argv[1])
+    parser = argparse.ArgumentParser(prog="python3 tools/pull-issue.py")
+    parser.add_argument("number", help="the issue number, e.g. 010")
+    parser.add_argument("--to", type=Path, default=OUT, help="where to write it (default: issue.json)")
+    args = parser.parse_args(argv[1:])
+    if not args.number.isdigit():
+        parser.error(f"{args.number!r} is not an issue number, e.g. 010")
+    number = int(args.number)
 
     week = number + FIRST_ISSUE_WEEK - 1
     if not FIRST_ISSUE_WEEK <= week <= TOTAL_WEEKS:
@@ -93,12 +104,13 @@ def main(argv):
         print(
             f"  warning: issue {number:03d} goes out "
             f"{moment:%a} {card_date(released)}, {moment:%H:%M} London time. "
-            f"Don't push issue.json before then.",
+            f"Don't post the video or push issue.json before then.",
             file=sys.stderr,
         )
 
-    OUT.write_text(json.dumps(issue, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"issue.json ← {number:03d} {issue['word']}, {issue['date']}")
+    args.to.parent.mkdir(parents=True, exist_ok=True)
+    args.to.write_text(json.dumps(issue, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"{os.path.relpath(args.to.absolute(), REEL)} ← {number:03d} {issue['word']}, {issue['date']}")
 
 
 if __name__ == "__main__":

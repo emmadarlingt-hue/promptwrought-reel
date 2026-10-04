@@ -12,6 +12,26 @@ issue.
 This folder exists to turn that page into a video, the same way every week.
 `BUILD-PLAN.md` lays out how, one milestone at a time.
 
+## Tuesday
+
+```bash
+npm run tuesday -- 011
+```
+
+That one line pulls issue 011 from the site, then renders and encodes square,
+portrait and vertical. You get nine files in `out/`: an MP4, a GIF and a still
+for each size. It takes about 30 seconds.
+
+- **It changes no tracked file.** It pulls the issue into `frames/issue.json`,
+  which git ignores, not into `issue.json`. So it's safe to run before the
+  email goes out, and nothing it does can be pushed early.
+- **Post the videos after the 13:31 email.** If the issue hasn't gone out yet,
+  the run ends by repeating pull-issue's warning.
+- **After the send, if you like,** move the live check page to the new word:
+  `python3 tools/pull-issue.py 011`, then commit and push.
+- **If a step fails,** tuesday names it ("render portrait failed") and stops
+  there. Each step can be run on its own with the commands below.
+
 ## Setup, once per clone
 
 ```bash
@@ -77,8 +97,14 @@ It is committed, because the deployed page fetches it.
 **Don't push an issue's `issue.json` before its email has gone out.** The repo
 is public and Netlify deploys every push to `main`, so a push publishes the
 word twice: on GitHub and on the reel site. The script warns on stderr while
-an issue's 13:31 London send is still ahead. Pulling early to render on the
-Mac is fine.
+an issue's 13:31 London send is still ahead.
+
+To render early without touching `issue.json`, add `--to`; that's what
+`npm run tuesday` does:
+
+```bash
+python3 tools/pull-issue.py 011 --to frames/issue.json
+```
 
 ## The three commands
 
@@ -91,7 +117,10 @@ Mac is fine.
 | `npm run check:square` | Prove the square render hasn't changed. It renders the frozen 010 fixture (`tools/fixtures/`) into a temporary folder and compares all 240 frames and the still with `tools/check-square.md5`. It leaves `issue.json` and `frames/` alone and takes about 9 seconds. After a change that's meant to show, look at the frames, then re-take the baseline with `-- --update`. | ✅ M3.5 |
 
 Render and encode stay separate, so a failure points at one half or the other.
-`npm run tuesday` arrives at M4 and chains pull-issue → render → encode.
+`npm run tuesday` (M4, above) chains them: pull-issue → render × 3 → encode × 3.
+Render also takes `--issue <file>`, to draw from a file other than
+`issue.json`, and `--frames <dir>`, to write somewhere other than
+`frames/<size>/`. Tuesday and `check:square` use those.
 
 `frames/` and `out/` are generated and ignored by git. Each size renders into
 its own folder, so the sizes can sit side by side. Each folder's `render.json`

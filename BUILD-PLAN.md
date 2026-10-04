@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0–M3.5 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M4.
+Status: M0–M3.5 done 4 Oct 2026; M4 built and dry-run, waiting for its live run. Netlify deploys from `main` and the repo is public. Next: once 011's issue file exists, `npm run tuesday -- 011` on 6 Oct, then post the MP4 after 13:31. That completes M4. Then the repo moves off `~/Desktop`, then M5.
 
 ## What it is
 
@@ -62,9 +62,9 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - Added while finishing: the handle keeps a fixed clearance of 0.1 × S above the letter's real top, the same for every letter. `npm run check:square` re-proves the square render against a committed hash baseline in about 9 s. `frames`, `out` and `node_modules` are kept out of iCloud until the repo moves off `~/Desktop` after 6 Oct.
 - You learn: designing around another app's interface, measuring the ink rather than trusting a font metric, and making failure as quick to see as success.
 
-### M4 — The Tuesday command
+### M4 — The Tuesday command (built 4 Oct; live run 6 Oct)
 
-- One line in the README's Tuesday section: `npm run tuesday -- 011` = pull-issue → render square + portrait + still → encode.
+- One line in the README's Tuesday section: `npm run tuesday -- 011` = pull-issue → render square + portrait + vertical + stills → encode. Built 4 Oct and dry-run on 010 and 009 (nine files each, about 30 s). It pulls into the ignored `frames/issue.json`, so it changes no tracked file and nothing can be pushed before the email.
 - Run it live for 011 handfinish on 6 Oct (or 012 if M2 isn't done by then). Post the MP4. That's the acceptance test.
 - Optional, after three issues have gone through by hand: a `workflow_dispatch` Action in this repo that does the same on a runner and attaches the files as a build artifact.
 - You learn: npm scripts as a way of naming a routine, and the discipline of automating a thing only after it's boring.
