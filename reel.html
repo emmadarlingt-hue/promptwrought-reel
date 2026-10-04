@@ -18,19 +18,30 @@ body{min-height:100vh;display:flex;flex-direction:column;justify-content:center;
 // needs real font metrics. Everything below waits for the fonts, then measures.
 (function () {
 
-// ---------- canvas: ?size=square (the default) or ?size=portrait ----------
-// One drawing, two canvases. Portrait is 4:5 for the LinkedIn feed. Only the
-// baseline and the summary block below it move; the eyebrow stays put and the
-// link follows the bottom edge on its own.
-const HEIGHTS = { square: 1080, portrait: 1350 };
+// ---------- canvas: ?size=square (the default), portrait or vertical ----------
+// One drawing, three canvases. CX is the block's centre line, TARGET how wide
+// the word is at rest (the font size is derived from it), RULE the baseline
+// rule's ends.
+//
+// Square and portrait (4:5, for the LinkedIn feed) use the whole frame.
+// Portrait keeps the baseline at the same fraction of the height as square.
+//
+// Vertical (9:16, for Reels and TikTok) has the apps' own buttons and
+// captions laid over its edges, so everything sits inside SAFE: the strictest
+// of their safe zones. Reels covers the top 14% and bottom 35% and about 65 px
+// a side; TikTok's button column covers the right 140 px. The block is centred
+// in that zone both ways, which puts it 38 px left of the frame's middle.
+const SIZES = {
+  square:   { H: 1080, CX: 540, TARGET: 880, RULE: [80, 1000] },
+  portrait: { H: 1350, CX: 540, TARGET: 880, RULE: [80, 1000] },
+  vertical: { H: 1920, CX: 502, TARGET: 780, RULE: [80, 925],
+              SAFE: { top: 269, bottom: 1248, left: 65, right: 940 } },
+};
 const SIZE = new URLSearchParams(location.search).get('size') ?? 'square';
-const W = 1080, H = HEIGHTS[SIZE] ?? 1080;
-// The baseline sits at the same fraction of the height on both canvases:
-// 460 of 1080 and 575 of 1350. SHIFT is 0 for square, so square is unchanged.
-const SHIFT = Math.round(460 * H / 1080) - 460;
-const BASE = 460 + SHIFT; // the locked baseline the letters stretch against
-const SUMMARY_Y = 620 + SHIFT;
-const TARGET = 880;      // how wide the word is at rest; the font size is derived from it
+const L = SIZES[SIZE] ?? SIZES.square;
+const W = 1080, H = L.H, CX = L.CX, TARGET = L.TARGET;
+// Where the block sits. Set once by layout(), before the first frame.
+let EYEBROW_Y, BASE, SUMMARY_Y, LINK_Y, SUM;
 
 // ---------- palette: the raw paint pots from tokens.css ----------
 const TEAL = '#0E2A35', CREAM = '#F5EDD6', LAV = '#C9B8D8', GOLD = '#C8922A';
@@ -104,9 +115,16 @@ function M(text, size, weight = 600, fam = 'd') {
   }
   return MC[k];
 }
+// The ink itself, not the advance: how far the drawn glyphs reach above and
+// below the baseline.
+function ink(text, size, weight = 600, fam = 'd') {
+  MCTX.font = `${weight} ${size}px ${fam === 'd' ? "'Playfair Display'" : "'DM Sans'"}`;
+  const m = MCTX.measureText(text);
+  return { up: m.actualBoundingBoxAscent, down: m.actualBoundingBoxDescent };
+}
 
 // ---------- derived once the fonts are in ----------
-let S, GAP, REST;
+let S, GAP, REST, ASC;
 function measureUp() {
   // Letter advances scale linearly with font size, so one probe gives the exact fit.
   const probe = 100, gapRatio = 0.13;
@@ -114,6 +132,9 @@ function measureUp() {
   S = probe * TARGET / w100;
   GAP = S * gapRatio;
   REST = LETTERS.map((c) => M(c, S));
+  // How high the peak letter's own ink reaches at rest. A 'w' tops out near
+  // 0.52 × S and an 'f' near 0.78 × S, so one cap-height guess fits neither.
+  ASC = ink(LETTERS[PEAK], S).up;
 }
 
 // Greedy wrap, needed because SVG text does not wrap on its own.
@@ -128,22 +149,46 @@ function wrap(str, size, maxW) {
   return lines;
 }
 
+// ---------- the layout: where the block sits on this canvas ----------
+// The block's own spacing is square's: the baseline 310 below the eyebrow,
+// the summary 160 below the baseline, the meta line 36 below the summary.
+function layout() {
+  SUM = wrap(SUMMARY, 26, 760);
+  if (!L.SAFE) {
+    // The baseline keeps the same fraction of the height: 460 of 1080 and 575
+    // of 1350. SHIFT is 0 for square, so square is unchanged. The eyebrow stays
+    // put and the link stays 70 from the bottom edge.
+    const SHIFT = Math.round(460 * H / 1080) - 460;
+    EYEBROW_Y = 150; BASE = 460 + SHIFT; SUMMARY_Y = 620 + SHIFT; LINK_Y = H - 70;
+    return;
+  }
+  // Inside a safe zone the link can't be pinned to the frame's edge, so it sits
+  // a fixed 160 below the meta line. The block runs from the eyebrow's ink top
+  // to the link's ink bottom, and its middle goes on the safe zone's middle.
+  // Its height depends on how many lines the definition wraps to.
+  const metaFromEyebrow = 310 + 160 + SUM.length * 40 + 36;
+  const linkFromEyebrow = metaFromEyebrow + 160;
+  const above = ink(EYEBROW.toUpperCase(), 19, 500, 'b').up;
+  const height = above + linkFromEyebrow + ink(LINK, 19, 500, 'b').down;
+  EYEBROW_Y = Math.round((L.SAFE.top + L.SAFE.bottom) / 2 - height / 2 + above);
+  BASE = EYEBROW_Y + 310; SUMMARY_Y = BASE + 160; LINK_Y = EYEBROW_Y + linkFromEyebrow;
+}
+
 // ---------- the frame: everything that never moves ----------
 function staticSvg() {
   let o = rect(0, 0, W, H, TEAL);
-  o += tx(W / 2, 150, EYEBROW.toUpperCase(), { s: 19, w: 500, fill: LAV, a: 'middle', ls: 3.4 });
+  o += tx(CX, EYEBROW_Y, EYEBROW.toUpperCase(), { s: 19, w: 500, fill: LAV, a: 'middle', ls: 3.4 });
 
   // The baseline the letters are pinned to, and its label.
-  o += line(80, BASE, W - 80, BASE, LAV, 1.4, 0.55);
+  o += line(L.RULE[0], BASE, L.RULE[1], BASE, LAV, 1.4, 0.55);
   // Right-anchored on purpose: the 'g' of ghostwrought descends to y~512 when
   // stretched, and on the left this label would sit underneath it.
-  o += tx(W - 80, BASE + 30, 'baseline', { s: 17, w: 500, fill: LAV, a: 'end', ls: 1.2, op: 0.7 });
+  o += tx(L.RULE[1], BASE + 30, 'baseline', { s: 17, w: 500, fill: LAV, a: 'end', ls: 1.2, op: 0.7 });
 
-  const sum = wrap(SUMMARY, 26, 760);
-  sum.forEach((ln, i) => { o += tx(W / 2, SUMMARY_Y + i * 40, ln, { s: 26, w: 400, fill: CREAM, a: 'middle', op: 0.92 }); });
-  const below = SUMMARY_Y + sum.length * 40;
-  o += tx(W / 2, below + 36, META, { s: 20, w: 500, fill: LAV, a: 'middle', op: 0.8 });
-  o += tx(W / 2, H - 70, LINK, { s: 19, w: 500, fill: GOLD, a: 'middle', ls: 1.4 });
+  SUM.forEach((ln, i) => { o += tx(CX, SUMMARY_Y + i * 40, ln, { s: 26, w: 400, fill: CREAM, a: 'middle', op: 0.92 }); });
+  const below = SUMMARY_Y + SUM.length * 40;
+  o += tx(CX, below + 36, META, { s: 20, w: 500, fill: LAV, a: 'middle', op: 0.8 });
+  o += tx(CX, LINK_Y, LINK, { s: 19, w: 500, fill: GOLD, a: 'middle', ls: 1.4 });
 
   o += `<g id="live"></g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${o}</svg>`;
@@ -160,7 +205,7 @@ function draw(p) {
   const ws = REST.map((wd, i) => wd * sx[i]);
   const total = ws.reduce((a, b) => a + b, 0) + GAP * (N - 1);
 
-  let o = '', x = (W - total) / 2, ex = 0;
+  let o = '', x = CX - total / 2, ex = 0;
   LETTERS.forEach((c, i) => {
     // scale() about the baseline origin: height grows upward, width about the left edge.
     o += `<g transform="translate(${r2(x)},${BASE}) scale(${r2(sx[i] * 1000) / 1000},${r2(sy[i] * 1000) / 1000})">`
@@ -169,8 +214,9 @@ function draw(p) {
     x += ws[i] + GAP;
   });
 
-  // The cap-height caliper on the peak letter, and the arrow pulling it up.
-  const capRest = BASE - S * 0.7, capNow = BASE - S * 0.7 * sy[PEAK];
+  // The caliper on the peak letter's real top, and the arrow pulling it up. The
+  // letter scales about the baseline, so its top is at ASC × sy above it.
+  const capRest = BASE - ASC, capNow = BASE - ASC * sy[PEAK];
   if (capRest - capNow > 3) o += line(ex, capRest, ex, capNow - 10, LAV, 1.4, 0.75, '3 4');
   o += circ(ex, capNow - 13, 6.5, TEAL, { stroke: LAV, sw: 2.4 });
   o += cursor(ex + 12, capNow - 32);
@@ -210,33 +256,36 @@ async function loadFonts() {
   } catch (e) { /* offline: fall through on the fallback metrics */ }
 }
 
-// Said on the stage rather than left blank. __ready is never set, so a render
-// waits on a page that cannot draw instead of recording an empty loop.
+// Said on the stage rather than left blank, and in window.__failed so a render
+// stops at once. __ready is never set, so nothing records an empty loop.
 function fail(err) {
-  const lines = SIZE in HEIGHTS ? [
+  const message = String(err && err.message || err);
+  const lines = SIZE in SIZES ? [
     ["Couldn't load issue.json.", 30, 500, CREAM],
     ['Run python3 tools/pull-issue.py 010, then npm run preview', 24, 400, CREAM],
     ['and open localhost:8000/reel.html. fetch refuses file://.', 24, 400, CREAM],
   ] : [
     ["Can't draw this size.", 30, 500, CREAM],
   ];
-  lines.push([String(err && err.message || err), 19, 500, LAV]);
+  lines.push([message, 19, 500, LAV]);
   let o = rect(0, 0, W, H, TEAL);
-  lines.forEach(([str, s, w, fill], i) => { o += tx(W / 2, 460 + i * 46, str, { s, w, fill, a: 'middle' }); });
+  lines.forEach(([str, s, w, fill], i) => { o += tx(W / 2, H / 2 - 80 + i * 46, str, { s, w, fill, a: 'middle' }); });
   document.getElementById('stage').innerHTML =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${o}</svg>`;
   console.error(err);
+  window.__failed = message;
 }
 
 async function start() {
   MCTX = document.createElement('canvas').getContext('2d');
   try {
-    if (!(SIZE in HEIGHTS)) throw new Error(`unknown size "${SIZE}": use square or portrait`);
+    if (!(SIZE in SIZES)) throw new Error(`unknown size "${SIZE}": use ${Object.keys(SIZES).join(', ')}`);
     const [issue] = await Promise.all([loadIssue(), loadFonts()]);
     useIssue(issue);
   } catch (err) { fail(err); return; }
 
   measureUp();
+  layout();
   document.getElementById('stage').innerHTML = staticSvg();
   const LIVE = document.getElementById('live');
   window.LOOP_SECONDS = LOOP;

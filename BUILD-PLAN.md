@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0–M3 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M4.
+Status: M0–M3.5 done 4 Oct 2026. Netlify deploys from `main` and the repo is public. Next: M4.
 
 ## What it is
 
@@ -53,6 +53,13 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - `npm run render -- --size portrait` → 1080×1350; the page reads a `?size=` parameter and moves the baseline and summary block, nothing else.
 - A still PNG from the hold (t = 4.4 s) as a share image.
 - You learn: parameterising one drawing for two canvases without copying the file.
+
+### M3.5 — Vertical, a truer caliper, a fast refusal ✅ 4 Oct 2026
+
+- `?size=vertical` → 1080×1920 for Reels / TikTok. The block is centred within the apps' safe zone, the part of the frame their own buttons and captions don't cover, not placed by the `SHIFT` rule.
+- The caliper measures the peak glyph's real top instead of cap height, so on a tall peak such as the `f` in verifidget and handfinish it sits on the letter rather than partway down it. This changes square's frames on purpose, so square's hash baseline is re-taken afterwards.
+- A `window.__failed` flag, set when the page refuses to draw, so a refused render exits at once instead of after the 30-second wait.
+- You learn: designing around another app's interface, measuring the ink rather than trusting a font metric, and making failure as quick to see as success.
 
 ### M4 — The Tuesday command
 

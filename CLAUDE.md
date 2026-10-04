@@ -16,6 +16,7 @@ Two rules hold at every milestone:
   transitions, no tween libraries, no unseeded randomness, and no clock read
   inside the drawing code. Only the `requestAnimationFrame` driver at the end
   of `reel.html` reads the clock, and `?render` switches it off. Keep
-  `window.seek`, `window.LOOP_SECONDS` and `window.__ready` working, because
-  the renderer depends on them. This is what makes a render deterministic and
+  `window.seek`, `window.LOOP_SECONDS`, `window.__ready`, `window.__failed`,
+  `window.CANVAS` and `window.STILL_SECONDS` working, because the renderer
+  depends on them. This is what makes a render deterministic and
   the loop seamless: the first and last frames are the same picture.

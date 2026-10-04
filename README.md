@@ -53,36 +53,71 @@ Mac is fine.
 | Command | What it does | Arrives |
 |---|---|---|
 | `npm run preview` | Serve the folder on port 8000. Open <http://localhost:8000/reel.html> to play the loop. It needs a server because `fetch` refuses `file://`. | ✅ M1 |
-| `npm run render` | Open `reel.html?render` in headless Chromium, wait for the page to be ready, then step through all 240 frames and save each one to `frames/square/` as a PNG, plus `still.png` from t = 4.4 s. Add `-- --size portrait` for 1080 × 1350 into `frames/portrait/`. | ✅ M2, portrait M3 |
-| `npm run encode` | Pass `frames/square/` to ffmpeg and get `out/010-ghostwrought-square.mp4`, `.gif` and `-still.png` back. Add `-- --size portrait` for the portrait set. | ✅ M2, portrait M3 |
+| `npm run render` | Open `reel.html?render` in headless Chromium, wait for the page to be ready, then step through all 240 frames and save each one to `frames/square/` as a PNG, plus `still.png` from t = 4.4 s. Add `-- --size portrait` for 1080 × 1350, or `-- --size vertical` for 1080 × 1920, into `frames/<size>/`. | ✅ M2, portrait M3, vertical M3.5 |
+| `npm run encode` | Pass `frames/square/` to ffmpeg and get `out/010-ghostwrought-square.mp4`, `.gif` and `-still.png` back. Add `-- --size portrait` or `-- --size vertical` for those sets. | ✅ M2, portrait M3, vertical M3.5 |
 | `npm run check:offline` | Prove render refuses fallback fonts. It runs render with its browser cut off from the network (`tools/offline-preload.mjs`), once with nothing reachable and once with only the stylesheet. Both runs must stop with "fonts didn't load" and leave `frames/` untouched. Takes about a second. | ✅ M2 |
 
 Render and encode stay separate, so a failure points at one half or the other.
 `npm run tuesday` arrives at M4 and chains pull-issue → render → encode.
 
 `frames/` and `out/` are generated and ignored by git. Each size renders into
-its own folder, so square and portrait can sit side by side. Each folder's
-`render.json` records which issue the frames show, and encode names its files
-from that rather than from `issue.json`, which may have changed since.
+its own folder, so the sizes can sit side by side. Each folder's `render.json`
+records which issue the frames show, and encode names its files from that
+rather than from `issue.json`, which may have changed since.
 
-### Square and portrait
+### Square, portrait and vertical
 
-One page draws both canvases. `reel.html?size=portrait` is 1080 × 1350, the 4:5
-shape that takes up more of a LinkedIn feed. `?size=square` is the default.
+One page draws all three canvases. `?size=square` is the default.
+
+**Portrait** (`?size=portrait`, 1080 × 1350) is the 4:5 shape that takes up more
+of a LinkedIn feed.
 
 - **What moves.** The baseline keeps the same fraction of the height: 460 of
   1080, and 575 of 1350. The definition and meta line move down with it, by
   115 px in portrait.
 - **What stays.** The eyebrow stays where it is, and the link stays 70 px from
   the bottom edge.
-- **Square is unchanged:** its frames are byte-identical to M2's.
+
+**Vertical** (`?size=vertical`, 1080 × 1920) is for Reels and TikTok. Those apps
+lay their own buttons and captions over the edges of the frame, so vertical
+isn't placed by the portrait rule.
+
+- **Everything sits inside the safe zone.** That's x 65–940, y 269–1248, the
+  strictest of the two apps on each edge:
+  - top: Reels covers 14%;
+  - bottom: Reels covers 35%;
+  - left: Reels covers about 65 px;
+  - right: TikTok's button column covers 140 px.
+
+  Sources: [Hopper](https://www.hopperhq.com/blog/instagram-reel-size/),
+  [1ClickReport](https://www.1clickreport.com/blog/meta-ads-creative-safe-zones-2026-guide),
+  [Cadenus](https://cadenus.io/resources/blog/tiktok-safe-zone/).
+- **The block is centred in that zone both ways.** The word is 780 px wide at
+  rest, against 880 in the other sizes. The centre line is x 502, 38 px left of
+  the frame's middle. The spacing inside the block is square's, with the link
+  a fixed 160 px below the meta line.
+- **The block's height is measured.** It runs from the eyebrow's ink to the
+  link's ink, so a definition that wraps to more lines is re-centred
+  automatically.
+
+**For all three:**
+
 - **The page tells the renderer what it needs.** `window.CANVAS` gives the
   canvas size, which sets the camera, and `window.STILL_SECONDS` gives the
   still's moment: 4.4 s, the middle of the hold, with the word fully
-  stretched. A size the page doesn't know is refused on the stage, so render
-  stops at the ready gate.
+  stretched.
 - **On a phone,** the page centres the tile vertically. A render's viewport is
   exactly the canvas, so the centring never shows in frames.
+
+### The caliper
+
+The dashed line, circle and arrow on the gold peak letter measure the letter's
+real top. The page asks the canvas how far the glyph's ink actually reaches
+(`actualBoundingBoxAscent`) and doesn't assume a cap height. A `w` tops out at
+about 0.52 × the font size and an `f` at about 0.78 ×, so a single guess of 0.7
+left the handle floating above the `w` and partway down the `f`. The letter
+stretches about its baseline, so its top is always that height times its
+stretch.
 
 ### How the render works
 
@@ -96,9 +131,11 @@ seconds?" 240 times, and the page has to give the same answer each time.
   its screenshot.
 - **`window.__ready` turns true** once `issue.json` and the fonts have loaded
   and been measured. Render waits for it before clearing or writing any frame.
-  If the page can't draw, it says why on the stage, `__ready` never turns
-  true, and render stops after 30 seconds with that message and leaves the
-  last good frames alone.
+- **`window.__failed` is set if the page can't draw,** for example with a
+  missing `issue.json` or an unknown size. The page says why on the stage and
+  `__ready` never turns true. Render stops at once with the page's message and
+  leaves the last good frames alone. Its 30-second timeout is only for a page
+  that hangs without saying why.
 - **Render refuses to use fallback fonts.** If Google Fonts can't be reached,
   it stops rather than drawing the word in Georgia. It looks in
   `document.fonts` for Playfair Display 600 and DM Sans 400 and 500 with

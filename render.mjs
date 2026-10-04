@@ -75,14 +75,21 @@ async function main() {
     await page.goto(`http://127.0.0.1:${server.address().port}/reel.html?render&size=${encodeURIComponent(size)}`);
 
     // Nothing is cleared, drawn or saved until the page says it is ready:
-    // issue.json fetched, fonts loaded and measured, frame 0 painted.
+    // issue.json fetched, fonts loaded and measured, frame 0 painted. A page
+    // that refuses to draw says so in window.__failed, so render stops at once.
+    // The timeout is only for a page that hangs without saying why.
     console.log(`waiting for reel.html to be ready (${pad(no, 3)} ${word}, ${size})…`);
+    const said = () => page.evaluate(() =>
+      [...document.querySelectorAll('#stage text')].map((t) => t.textContent).join(' '));
     try {
-      await page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT });
+      await page.waitForFunction(() => window.__ready === true || typeof window.__failed === 'string',
+        null, { timeout: READY_TIMEOUT });
     } catch {
-      const said = await page.evaluate(() =>
-        [...document.querySelectorAll('#stage text')].map((t) => t.textContent).join(' '));
-      throw new Error(`reel.html never became ready.${said ? ` The page says: ${said}` : ''}`);
+      const text = await said();
+      throw new Error(`reel.html never became ready.${text ? ` The page says: ${text}` : ''}`);
+    }
+    if (await page.evaluate(() => typeof window.__failed === 'string')) {
+      throw new Error(`reel.html refused to draw. The page says: ${await said()}`);
     }
 
     const missing = await page.evaluate((wanted) => {
@@ -106,7 +113,11 @@ async function main() {
     // Only now, with a page that can draw, is it safe to clear the last render
     // of this size. The other size's frames are left alone.
     const frames = join(ROOT, 'frames', size);
-    rmSync(frames, { recursive: true, force: true });
+    // Retried because this folder sits in iCloud Drive (~/Desktop syncs), and
+    // iCloud can drop a conflict copy ("0078 2.png") into it mid-delete, which
+    // fails with ENOTEMPTY. encode reads only 0001.png-style names, so those
+    // copies never reach a video.
+    rmSync(frames, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
     mkdirSync(frames, { recursive: true });
 
     let first, last;
