@@ -2,7 +2,7 @@
 
 Planned 4 Oct 2026. One 8-second motion loop per issue, rendered to MP4 and GIF from the issue JSON, for LinkedIn / Substack Notes / the post header each Tuesday.
 
-Status: M0 and M1 done 4 Oct 2026. Next: link the Netlify site to the repo (still deployed by folder upload), then M2.
+Status: M0, M1 and M2 done 4 Oct 2026. Next: link the Netlify site to the repo (still deployed by folder upload), then M3.
 
 ## What it is
 
@@ -41,7 +41,7 @@ Each one ends with a commit and push. Open each in Claude Code in plan mode; M2 
 - Run it for issue 009 too. If verifidget's definition wraps differently and the layout survives, M1 is done.
 - You learn: the separation of data from drawing — the same split as `issues/*.json` → `index.html` on the site, now applied to motion. Also why `fetch` needs a server.
 
-### M2 — Render to video
+### M2 — Render to video ✅ 4 Oct 2026
 
 - `render.mjs` (Node + Playwright): opens `reel.html?render`, waits for `window.__ready`, then for each of 240 frames (8 s × 30 fps) calls `seek(t)` and screenshots `frames/0001.png` … (`npm run render`).
 - ffmpeg stitches frames → `out/010-ghostwrought.mp4` (H.264, `yuv420p`, so LinkedIn and Substack accept it) and → `out/010-ghostwrought.gif` (two-pass palette, so cream and gold don't band) (`npm run encode`).

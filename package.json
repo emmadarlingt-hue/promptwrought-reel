@@ -3,6 +3,11 @@
   "private": true,
   "description": "The Promptwrought word of the week as a square motion loop",
   "scripts": {
-    "preview": "python3 -m http.server 8000"
+    "preview": "python3 -m http.server 8000",
+    "render": "node render.mjs",
+    "encode": "node encode.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
   }
 }
